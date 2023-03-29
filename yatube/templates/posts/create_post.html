@@ -1,62 +1,46 @@
-{% extends "base.html" %}
-{% block title %}Новый пост{% endblock %}
+{% extends 'base.html' %}
+{% block title %}
+  {% if is_edit %} Добавить запись {% else %} Редактировать запись {% endif %}
+{%endblock%}
 {% block content %}
-{% load user_filters %}
-  {% with request.resolver_match.view_name as view_name %}
-    <main>
       <div class="container py-5">
         <div class="row justify-content-center">
           <div class="col-md-8 p-5">
             <div class="card">
-              <div class="card-header"> 
-                {% if view_name  == 'posts:post_create' %}
-                Добавить запись
-                {% else %}
-                Редактировать запись
-                {% endif %}               
+              <div class="card-header">
+                {% if is_edit %} Редактировать пост {% else %} Создать новый пост {% endif %}
               </div>
+              {% if form.errors %}
+                {% for field in form %}
+                {% for error in field.errors %}
+                  <div class="alert alert-danger" role="alert">
+                  {{ field.label }}: {{ error|escape }}
+                  </div>
+                {% endfor %}
+                {% endfor %}
+              {% endif %}
               <div class="card-body">
-                {% if view_name  == 'posts:post_create' %}        
-                  <form method="post" enctype="multipart/form-data" action="{% url 'posts:post_create' %} ">
-                {% else %}
-                  <form method="post" enctype="multipart/form-data">
-                {% endif %}
+                <form method="post" action="{% url 'posts:post_create' %}">
                   {% csrf_token %}
+                  {% for field in form %}
                   <div class="form-group row my-3 p-3">
-                    <label for="id_text">
-                      Текст поста
-                      <span class="required text-danger" >*</span>                  
+                    <label for="{{ field.id_for_label }}">
+                      {{ field.label }}
+                      {% if field.field.required %}
+                        <span class="required text-danger">*</span>
+                      {% endif %}
                     </label>
-                    {{ form.text }}               
-                      <small class="form-text text-muted">
-                        {{ form.text.help_text }}
+                    {{ field }}
+                    {% if field.help_text %}
+                      <small id="{{ field.id_for_label }}-help" class="form-text text-muted">
+                        {{ field.help_text|safe }}
                       </small>
-                  </div>            
-                  <div class="form-group row my-3 p-3">
-                    <label for="id_group">
-                      Group                  
-                    </label>
-                    {{ form.group|addclass:'form-control' }}
-                      <small class="form-text text-muted">
-                        {{ form.group.help_text }}
-                      </small>
+                    {% endif %}
                   </div>
-                  <div class="form-group row my-3 p-3">
-                    <label for="id_image">
-                      Image                  
-                    </label>
-                    {{ form.image|addclass:'form-control' }}
-                      <small class="form-text text-muted">
-                        {{ form.image.help_text }}
-                      </small>
-                  </div>
+                  {% endfor %}
                   <div class="d-flex justify-content-end">
                     <button type="submit" class="btn btn-primary">
-                      {% if view_name  == 'posts:post_create' %}
-                        Сохранить
-                      {% else %}
-                        Добавить
-                      {% endif %}
+                      {% if is_edit %} Сохранить {% else %} Добавить {% endif %}
                     </button>
                   </div>
                 </form>
@@ -65,8 +49,4 @@
           </div>
         </div>
       </div>
-    </main>
-  {% endwith %}
 {% endblock %}
-
-

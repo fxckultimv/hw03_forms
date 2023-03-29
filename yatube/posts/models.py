@@ -1,95 +1,35 @@
-from core.models import CreatedModel
-from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import UniqueConstraint
+from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
 
-class Group(models.Model):
-    """Класс Group описывает модель Групп в БД"""
-    title = models.CharField(max_length=200, verbose_name='Название')
-    slug = models.SlugField(max_length=200, unique=True, verbose_name='Слаг')
-    description = models.TextField(verbose_name='Описание')
-
-    def __str__(self) -> str:
-        return self.title
-
-
-class Post(CreatedModel):
-    """Класс Post описывает модель Постов в БД """
-    text = models.TextField(
-        verbose_name='Текст поста',
-        help_text='Введите текст поста'
-    )
-    group = models.ForeignKey(
-        Group,
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True,
-        related_name='posts',
-        verbose_name='Группа',
-        help_text='Выберите группу'
-    )
+class Post(models.Model):
+    text = models.TextField()
+    pub_date = models.DateTimeField(auto_now_add=True)
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name='posts',
-        verbose_name='Автор'
+        related_name='posts'
     )
-    image = models.ImageField(
-        verbose_name='Картинка',
-        upload_to='posts/',
-        blank=True
-    )
+    group = models.ForeignKey(
+        'Group',
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='posts')
+
+    def __str__(self):
+        return self.text
 
     class Meta:
         ordering = ['-pub_date']
 
-    def __str__(self) -> str:
-        return self.text[:15]
 
+class Group(models.Model):
+    title = models.CharField(max_length=200)
+    slug = models.SlugField(unique=True)
+    description = models.TextField()
 
-class Comment(CreatedModel):
-    post = models.ForeignKey(
-        Post,
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True,
-        related_name='comments',
-        verbose_name='Комментарий',
-        help_text='Ваш комментарий'
-    )
-    author = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='comments',
-        verbose_name='Автор комментария'
-    )
-    text = models.TextField(
-        verbose_name='Текст комментария',
-        help_text='Введите текст комментария'
-    )
-
-
-class Follow(models.Model):
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='follower',
-        verbose_name='Пользователь'
-    )
-    author = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='following',
-        verbose_name='Автор'
-    )
-
-    class Meta:
-        constraints = UniqueConstraint(
-            fields=['user', 'author'], name='unique_following'
-        )
-
-    def __str__(self) -> str:
-        return f'user: {self.user}, author: {self.author}'
+    def __str__(self):
+        return self.title
