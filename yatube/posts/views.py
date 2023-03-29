@@ -1,107 +1,129 @@
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
+
+from yatube.settings import NUMBER_OF_POSTS
+
 from .forms import CommentForm, PostForm
-from .models import Follow, Group, Post, User
-from constants import PAGE_LIMIT
+from .models import Follow, Group, Post
+
+User = get_user_model()
 
 
-def paginator(request, post_list):
-    """Паджинатор."""
-    paginator = Paginator(post_list, PAGE_LIMIT)
-    page_number = request.GET.get('page')
+def pagination_process(req, obj, number) -> Paginator:
+    paginator = Paginator(obj, number)
+    page_number = req.GET.get('page')
     return paginator.get_page(page_number)
 
 
 def index(request):
-    """Функция для отображения главной страницы проекта."""
-    post_list = Post.objects.select_related('author', 'group')
-
+    """Обработчик главной страницы."""
+    posts = Post.objects.all()
+    page_obj = pagination_process(request, posts, NUMBER_OF_POSTS)
+    template = 'posts/index.html'
     context = {
-        'page_obj': paginator(request, post_list),
+        'page_obj': page_obj
     }
-    return render(request, 'posts/index.html', context)
+    return render(request=request, template_name=template, context=context)
 
 
 def group_posts(request, slug):
-    """Функция для отображения страницы сообщества."""
+    """Обработчик груп постов."""
     group = get_object_or_404(Group, slug=slug)
-    post_list = group.posts.select_related('author')
-
+    posts = group.posts.all()
+    page_obj = pagination_process(request, posts, NUMBER_OF_POSTS)
+    template = 'posts/group_list.html'
     context = {
         'group': group,
-        'page_obj': paginator(request, post_list),
+        'page_obj': page_obj
     }
-    return render(request, 'posts/group_list.html', context)
+    return render(request=request, template_name=template, context=context)
 
 
 def profile(request, username):
-    """Функция для отображения профиля пользователя."""
+    """Обработчик страницы автора."""
     author = get_object_or_404(User, username=username)
-    post_list = author.posts.select_related('group')
-    following = request.user.is_authenticated and (
-        request.user.follower.filter(author=author).exists()
-    )
+    user = request.user
+    posts = author.posts.all()
+    following = False
+    if user.is_authenticated:
+        if author.following.filter(user=user).exists():
+            following = True
+    page_obj = pagination_process(request, posts, NUMBER_OF_POSTS)
+    template = 'posts/profile.html'
     context = {
-        'author': author,
-        'page_obj': paginator(request, post_list),
-        'following': following,
+        'posts_user': posts,
+        'username': author,
+        'page_obj': page_obj,
+        'following': following
     }
-    return render(request, 'posts/profile.html', context)
+    return render(request, template_name=template, context=context)
 
 
 def post_detail(request, post_id):
-    """Функция для отображения конкретной записи."""
-    post = get_object_or_404(Post, pk=post_id)
-    form = CommentForm()
-    comments = post.comments.all()
+    """Обработчик страницы поста в деталях."""
+    post = get_object_or_404(Post, id=post_id)
+    form_comment = CommentForm()
+    comments_post = post.comments.all()
+    user = post.author
+    count_posts = user.posts.count()
+    template = 'posts/post_detail.html'
     context = {
         'post': post,
-        'form': form,
-        'comments': comments
+        'count_posts': count_posts,
+        'form': form_comment,
+        'comments': comments_post
     }
-    return render(request, 'posts/post_detail.html', context)
+    return render(request, template_name=template, context=context)
 
 
 @login_required
 def post_create(request):
-    """Функция для создания записи."""
+    """Обработчик создания поста."""
+    template = 'posts/create_post.html'
     form = PostForm(
         request.POST or None,
         files=request.FILES or None
     )
-    if not form.is_valid():
-        return render(request, 'posts/create_post.html', {'form': form})
-    post = form.save(commit=False)
-    post.author = request.user
-    post.save()
-    return redirect('posts:profile', username=post.author)
+
+    if form.is_valid():
+        post = form.save(commit=False)
+        post.author = request.user
+        post.save()
+        return redirect('posts:profile', post.author)
+
+    context = {
+        'form': form
+    }
+    return render(request, template_name=template, context=context)
 
 
 @login_required
 def post_edit(request, post_id):
-    """Функция для редактирования записи."""
-    post = get_object_or_404(Post, pk=post_id)
-    if post.author != request.user:
-        return redirect('posts:post_detail', post_id=post_id)
+    """Обработчик редактирования поста."""
+    post = get_object_or_404(Post, id=post_id)
+
     form = PostForm(
         request.POST or None,
         files=request.FILES or None,
-        instance=post,
+        instance=post
     )
-    if not form.is_valid():
-        return render(request, 'posts/create_post.html', {
-            'post': post,
-            'form': form,
-            'is_edit': True
-        })
-    form.save()
-    return redirect('posts:post_detail', post_id=post_id)
+    if form.is_valid() and post.author == request.user:
+        form.save()
+        return redirect('posts:post_detail', post.id)
+
+    template = 'posts/create_post.html'
+    context = {
+        'form': form,
+    }
+    return render(request, template_name=template, context=context)
 
 
 @login_required
 def add_comment(request, post_id):
-    post = get_object_or_404(Post, pk=post_id)
+    """Добавление комментария."""
+    post = get_object_or_404(Post, id=post_id)
     form = CommentForm(request.POST or None)
     if form.is_valid():
         comment = form.save(commit=False)
@@ -113,23 +135,36 @@ def add_comment(request, post_id):
 
 @login_required
 def follow_index(request):
-    post_list = Post.objects.filter(author__following__user=request.user)
+    """Обработчик страницы подписок"""
+    user = request.user
+    posts = Post.objects.filter(author__following__user=user)
+    page_obj = pagination_process(request, posts, NUMBER_OF_POSTS)
+    template = 'posts/follow.html'
     context = {
-        'page_obj': paginator(request, post_list),
+        'page_obj': page_obj
     }
-    return render(request, 'posts/follow.html', context)
+    return render(request=request, template_name=template, context=context)
 
 
 @login_required
 def profile_follow(request, username):
+    """Подписаться на автора."""
     author = get_object_or_404(User, username=username)
-    if request.user != author:
-        Follow.objects.get_or_create(user=request.user, author=author)
+    user = request.user
+    if author == user:
+        return redirect('posts:profile', username=username)
+
+    Follow.objects.get_or_create(user=user, author=author)
     return redirect('posts:profile', username=username)
 
 
 @login_required
 def profile_unfollow(request, username):
+    """Отписаться от автора."""
     author = get_object_or_404(User, username=username)
-    Follow.objects.filter(user=request.user, author=author).delete()
+    user = request.user
+    follow_user = author.following.filter(user=user)
+    if follow_user:
+        follow_user.delete()
+
     return redirect('posts:profile', username=username)

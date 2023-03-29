@@ -1,7 +1,7 @@
-import datetime as dt
+import datetime
 
 
 def year(request):
-    """Функция для отображения текущего года."""
-    year = dt.datetime.now().year
-    return {'year': year}
+    """Добавляет переменную с текущим годом."""
+    now = datetime.datetime.now()
+    return {'year': now.year}

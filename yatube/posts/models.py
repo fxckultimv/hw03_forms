@@ -1,118 +1,83 @@
+from core.models import CreatedModel
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.db.models import UniqueConstraint
 
 User = get_user_model()
 
-LENGTH_TEXT = 15
-
-
-class Post(models.Model):
-    """Класс для создания записей."""
-
-    text = models.TextField(
-        verbose_name='Запись',
-        help_text='Пожалуйста, оставьте Вашу запись'
-    )
-    pub_date = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name='Дата публикации',
-        db_index=True
-    )
-    author = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='posts',
-        verbose_name='автор'
-    )
-    group = models.ForeignKey(
-        'Group',
-        on_delete=models.SET_NULL,
-        related_name='posts',
-        blank=True,
-        null=True,
-        verbose_name='Сообщество',
-        help_text='Пожалуйста, выберите Вашу группу'
-    )
-    image = models.ImageField(
-        upload_to='posts/',
-        blank=True,
-        verbose_name='Изображение'
-    )
-
-    class Meta:
-        verbose_name = 'Запись'
-        verbose_name_plural = 'Записи'
-        ordering = ('-pub_date',)
-
-    def __str__(self):
-        return self.text[:LENGTH_TEXT]
-
 
 class Group(models.Model):
-    """Класс для создания сообществ."""
+    """Класс Group описывает модель Групп в БД"""
+    title = models.CharField(max_length=200, verbose_name='Название')
+    slug = models.SlugField(max_length=200, unique=True, verbose_name='Слаг')
+    description = models.TextField(verbose_name='Описание')
 
-    title = models.CharField(
-        max_length=200,
-        verbose_name='Название сообщества',
-        db_index=True
-    )
-    slug = models.SlugField(
-        unique=True,
-        verbose_name='адрес'
-    )
-    description = models.TextField(verbose_name='описание')
-
-    class Meta:
-        verbose_name = 'Сообщество'
-        verbose_name_plural = 'Сообщества'
-        ordering = ('title',)
-
-    def __str__(self):
+    def __str__(self) -> str:
         return self.title
 
 
-class Comment(models.Model):
-    """Класс для комментирования записей."""
+class Post(CreatedModel):
+    """Класс Post описывает модель Постов в БД """
+    text = models.TextField(
+        verbose_name='Текст поста',
+        help_text='Введите текст поста'
+    )
+    group = models.ForeignKey(
+        Group,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='posts',
+        verbose_name='Группа',
+        help_text='Выберите группу'
+    )
+    author = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='posts',
+        verbose_name='Автор'
+    )
+    image = models.ImageField(
+        verbose_name='Картинка',
+        upload_to='posts/',
+        blank=True
+    )
 
+    class Meta:
+        ordering = ['-pub_date']
+
+    def __str__(self) -> str:
+        return self.text[:15]
+
+
+class Comment(CreatedModel):
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
+        blank=True,
+        null=True,
         related_name='comments',
-        verbose_name='запись'
+        verbose_name='Комментарий',
+        help_text='Ваш комментарий'
     )
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name='comments',
-        verbose_name='Автор'
+        verbose_name='Автор комментария'
     )
     text = models.TextField(
-        verbose_name='Комментарий',
-        help_text='Пожалуйста, оставьте Ваш комментарий'
+        verbose_name='Текст комментария',
+        help_text='Введите текст комментария'
     )
-    created = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name='дата публикации',
-        db_index=True
-    )
-
-    class Meta:
-        verbose_name = 'Комментарий'
-        verbose_name_plural = 'Комментарии'
-        ordering = ('-created',)
-
-    def __str__(self):
-        return self.text[:LENGTH_TEXT]
 
 
 class Follow(models.Model):
-    """Класс для подписки на авторов."""
-
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name='follower',
-        verbose_name='подписчик'
+        verbose_name='Пользователь'
     )
     author = models.ForeignKey(
         User,
@@ -122,10 +87,9 @@ class Follow(models.Model):
     )
 
     class Meta:
-        verbose_name = 'Подписка'
-        verbose_name_plural = 'Подписки'
-        ordering = ('author',)
+        constraints = UniqueConstraint(
+            fields=['user', 'author'], name='unique_following'
+        )
 
-        constraints = (models.UniqueConstraint(
-            fields=['author', 'user'], name='unique_follow'
-        ),)
+    def __str__(self) -> str:
+        return f'user: {self.user}, author: {self.author}'

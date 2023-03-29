@@ -1,37 +1,50 @@
+from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from ..models import Post, User
+from ..models import Group, Post
+
+User = get_user_model()
 
 
-class PostCreateFormTests(TestCase):
+class CacheTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.user = User.objects.create_user(username='LevKharkov')
-        cls.index = reverse('posts:index')
-        cls.post = Post.objects.create(
-            text='Тестовый текст поста для кеша',
-            author=cls.user
+        cls.user = User.objects.create_user(username='Slava')
+        cls.authorized_client = Client()
+        cls.authorized_client.force_login(cls.user)
+        cache.clear()
+
+    def test_cache(self):
+        """Тест для проверки кеширования главной страницы"""
+        template_page_name = reverse('posts:index')
+        group = Group.objects.create(
+            title='Тестовая группа',
+            slug='test_slug',
+            description='Тестовое описание',
         )
-
-    def setUp(self):
-        self.user_client = Client()
-        self.user_client.force_login(self.user)
-
-    def test_index_post_list_cache(self):
-        """
-        Список записей главной страницы
-        хранится в кеше и обновлялся раз в 20 секунд
-        """
+        # 1. Создаём пост.
+        post = Post.objects.create(
+            author=self.user,
+            text='Тестовый пост',
+            group=group
+        )
+        # 2. Смотрим на страницу, сохраняем контент.
+        response = self.authorized_client.get(template_page_name)
+        content_page = response.content
+        # 3. Удаляем пост.
+        post.delete()
+        # 4. Снова смотрим на страницу и сохраняем контент.
+        response_2 = self.authorized_client.get(template_page_name)
+        content_2_page = response_2.content
+        # 5. Сравниваем контент из пункта 2 и 4, должны совподать.
+        self.assertEqual(content_page, content_2_page)
+        # 6. Чистим кэш.
         cache.clear()
-        response_one = self.client.get(self.index)
-        cache.set('index_page', response_one.content, 20)
-        self.assertEqual(response_one.content, cache.get('index_page'))
-        self.post.delete()
-        response_two = self.client.get(self.index)
-        self.assertEqual(response_two.content, cache.get('index_page'))
-        cache.clear()
-        response_last = self.client.get(self.index)
-        self.assertNotEqual(response_last.content, cache.get('index_page'))
+        # 7. Снова смотрим на страницу и сохраняем контент.
+        response_3 = self.authorized_client.get(template_page_name)
+        content_3_page = response_3.content
+        # 8. Теперь контенты не совпадают
+        self.assertNotEqual(content_page, content_3_page)

@@ -2,6 +2,7 @@ from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
+from django.urls import reverse
 
 from ..models import Group, Post
 
@@ -12,116 +13,202 @@ class PostURLTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.author = User.objects.create_user(username='testAuthor')
-        cls.author_client = Client()
-        cls.author_client.force_login(cls.author)
+        cls.guest_client = Client()
+        cls.user = User.objects.create_user(username='Slava')
+        cls.authorized_client = Client()
+        cls.authorized_client.force_login(cls.user)
+
         cls.group = Group.objects.create(
             title='Тестовая группа',
-            slug='test',
+            slug='test-slug',
             description='Тестовое описание',
         )
         cls.post = Post.objects.create(
-            author=cls.author,
-            text='Длинный тестовый пост',
+            author=cls.user,
+            text='Тестовая группа',
         )
 
-        cls.INDEX = '/'
-        cls.GROUP_POSTS = f'/group/{cls.group.slug}/'
-        cls.PROFILE = f'/profile/{cls.author.username}/'
-        cls.POST_DETAIL = f'/posts/{cls.post.id}/'
-        cls.NON_EXISTING_PAGE = '/existing_page/'
-        cls.CREATE = '/create/'
-        cls.EDIT = f'/posts/{cls.post.id}/edit/'
-        cls.CREATE_REVERSE = '/auth/login/?next=/create/'
-        cls.EDIT_REVERSE = f'/auth/login/?next=/posts/{cls.post.id}/edit/'
+    def test_home_page(self):
+        """Проверяем что страница работает корректно"""
+        response = self.guest_client.get('/')
+        self.assertEqual(response.status_code, HTTPStatus.OK.value)
 
-    def setUp(self):
-        self.guest_client = Client()
-        self.user = User.objects.create_user(username='testAuthorized')
-        self.authorized_client = Client()
-        self.authorized_client.force_login(self.user)
+    def test_group_slug(self):
+        """Проверяем что страница работает корректно"""
+        path = reverse('posts:group_list', kwargs={'slug': self.group.slug})
+        response = self.guest_client.get(path=path)
+        self.assertEqual(response.status_code, HTTPStatus.OK.value)
 
-        self.public_urls = [
-            (PostURLTests.INDEX, 'posts/index.html'),
-            (PostURLTests.GROUP_POSTS, 'posts/group_list.html'),
-            (PostURLTests.PROFILE, 'posts/profile.html'),
-            (PostURLTests.POST_DETAIL, 'posts/post_detail.html'),
-        ]
+    def test_create_post_page(self):
+        """Проверяем что происходит редирект
+            не авторизованного пользователя"""
+        path = reverse('posts:post_create')
+        response = self.guest_client.get(path=path)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND.value)
 
-        self.private_urls = [
-            (PostURLTests.CREATE, 'posts/create_post.html'),
-            (PostURLTests.EDIT, 'posts/create_post.html'),
-        ]
+    def test_edit_post_page(self):
+        """Проверяем что происходит редирект
+            не авторизованного пользователя"""
+        path = reverse('posts:post_edit', kwargs={'post_id': self.post.id})
+        response = self.guest_client.get(path=path)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND.value)
 
-    def test_existing_pages(self):
-        """Проверяем, что страницы доступны любому пользователю
-        и существуют."""
+    def test_not_found(self):
+        """Проверяем не существующую страницу 404"""
+        response = self.guest_client.get('/not_found/')
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND.value)
+        self.assertTemplateUsed(response, 'core/404.html')
 
-        for url, _ in self.public_urls:
-            with self.subTest(url=url):
-                response = self.guest_client.get(url)
-                self.assertEqual(
-                    response.status_code,
-                    HTTPStatus.OK
-                )
+    def test_create_redirect_anonymous(self):
+        """Проверяем правильность редиректа, анонимного юзера"""
+        path = reverse('posts:post_create')
+        response = self.guest_client.get(path=path, follow=True)
+        self.assertRedirects(
+            response, reverse('users:login') + '?next=' + path)
 
-    def test_unexisting_page(self):
-        """Проверяем, что запрос к несуществующей странице
-        вернёт ошибку 404."""
-        response = self.guest_client.get(PostURLTests.NON_EXISTING_PAGE)
-        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
-
-    def test_authorized_client_creates_post(self):
-        """Проверяем, что авторизованный пользователь может создать запись."""
-        response = self.authorized_client.get(PostURLTests.CREATE)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-
-    def test_post_create_url_redirect_anonymous_on_login(self):
-        """Проверяем, что страница /posts/create/ перенаправит
-        анонимного пользователя на страницу /login/."""
-        response = self.guest_client.get(PostURLTests.CREATE, follow=True)
-        self.assertRedirects(response, PostURLTests.CREATE_REVERSE)
-
-    def test_only_author_edites_post(self):
-        """Проверяем, что страница /posts/<int:post_id>/edit/ доступна автору
-        и используется корректный шаблон."""
-        response = self.author_client.get(PostURLTests.EDIT)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertTemplateUsed(response, 'posts/create_post.html')
-
-    def test_post_edit_url_redirect_anonymous_on_login(self):
-        """Проверяем, что страница /posts/<int:post_id>/edit/ перенаправит
-        анонимного пользователя на страницу /login/."""
-        response = self.guest_client.get(PostURLTests.EDIT, follow=True)
-        self.assertRedirects(response, PostURLTests.EDIT_REVERSE)
-
-    def test_post_edit_url_redirect_authorized_on_post_detail(self):
-        """Проверяем, что страница /posts/<int:post_id>/edit/ перенаправит
-        авторизованного пользователя на страницу /posts/<int:post_id>/."""
-        response = self.authorized_client.get(PostURLTests.EDIT, follow=True)
-        self.assertRedirects(response, PostURLTests.POST_DETAIL)
-
-    def test_post_edit_url_redirect_other_author_on_post_detail(self):
-        """Проверяем, что страница /posts/<int:post_id>/edit/ перенаправит
-        другого автора на страницу /posts/<int:post_id>/."""
-        self.other_author = User.objects.create_user(username='OtherAuthor')
-        self.other_author_client = Client()
-        self.other_author_client.force_login(self.other_author)
-        self.other_post = Post.objects.create(
-            author=self.other_author,
-            text='Длинный другой пост',
+    def test_post_edit_redirect_anonymous(self):
+        """Проверяем правильность редиректа, анонимного юзера"""
+        path = reverse('posts:post_edit', kwargs={'post_id': self.post.id})
+        response = self.guest_client.get(path=path, follow=True)
+        self.assertRedirects(
+            response, reverse('users:login') + '?next=' + path
         )
 
-        response = self.other_author_client.get(PostURLTests.EDIT, follow=True)
-        self.assertRedirects(response, PostURLTests.POST_DETAIL)
+    def test_urls_uses_correct_template(self):
+        """URL-адрес использует соответствующий шаблон."""
+        templates_url_names = {
+            '/': 'posts/index.html',
+            f'/group/{self.group.slug}/': 'posts/group_list.html',
+            f'/profile/{self.user}/': 'posts/profile.html',
+            f'/posts/{self.post.id}/': 'posts/post_detail.html',
+            f'/posts/{self.post.id}/edit/': 'posts/create_post.html',
+            '/create/': 'posts/create_post.html'
+        }
 
-    def test_accordance_urls_templates(self):
-        """Проверяем cоответствие адресов и шаблонов."""
+        for address, template in templates_url_names.items():
+            with self.subTest(address=address):
+                response = self.authorized_client.get(address)
+                self.assertTemplateUsed(response, template)
 
-        for url, template in self.private_urls + self.private_urls:
-            with self.subTest(url=url):
-                response = self.author_client.get(url)
-                self.assertTemplateUsed(
-                    response,
-                    template
-                )
+
+class CommentURLTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.guest_client = Client()
+        cls.user = User.objects.create_user(username='Slava')
+        cls.authorized_client = Client()
+        cls.authorized_client.force_login(cls.user)
+
+        cls.group = Group.objects.create(
+            title='Тестовая группа',
+            slug='test-slug',
+            description='Тестовое описание',
+        )
+        cls.post = Post.objects.create(
+            author=cls.user,
+            text='Тестовая группа',
+        )
+
+    def test_create_comment_page_guest(self):
+        """Проверяем что происходит редирект
+            не авторизованного пользователя"""
+        path = reverse('posts:add_comment', kwargs={'post_id': self.post.id})
+        response = self.guest_client.get(path=path)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND.value)
+
+    def test_create_comment_page_authorized(self):
+        """Проверяем что происходит редирект
+            авторизованного пользователя"""
+        path = reverse('posts:add_comment', kwargs={'post_id': self.post.id})
+        response = self.authorized_client.get(path=path)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND.value)
+
+    def test_create_comment_redirect_guest(self):
+        """Проверяем что происходит корректный редирект
+            не авторизованного пользователя"""
+        path = reverse('posts:add_comment', kwargs={'post_id': self.post.id})
+        response = self.guest_client.get(path=path)
+        self.assertRedirects(
+            response, reverse('users:login') + '?next=' + path
+        )
+
+
+class FollowURLTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.guest_client = Client()
+        cls.user = User.objects.create_user(username='Slava')
+        cls.authorized_client = Client()
+        cls.authorized_client.force_login(cls.user)
+
+        cls.group = Group.objects.create(
+            title='Тестовая группа',
+            slug='test-slug',
+            description='Тестовое описание',
+        )
+        cls.post = Post.objects.create(
+            author=cls.user,
+            text='Тестовая группа',
+        )
+
+    def test_follow_index_page_guest(self):
+        """Проверяем что происходит редирект
+            не авторизованного пользователя"""
+        path = reverse('posts:follow_index')
+        response = self.guest_client.get(path=path)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND.value)
+
+    def test_follow_index_page_authorized(self):
+        """Проверяем что страница подписок работает корректно"""
+        path = reverse('posts:follow_index')
+        response = self.authorized_client.get(path=path)
+        self.assertEqual(response.status_code, HTTPStatus.OK.value)
+
+    def test_follow_index_redirect_guest(self):
+        """Проверяем что происходит корректный редирект
+            не авторизованного пользователя"""
+        path = reverse('posts:follow_index')
+        response = self.guest_client.get(path=path)
+        self.assertRedirects(
+            response, reverse('users:login') + '?next=' + path
+        )
+
+    def test_profile_follow_guest(self):
+        """Проверяем что происходит редирект
+            не авторизованного пользователя"""
+        path = reverse('posts:profile_follow', kwargs={'username': self.user})
+        response = self.guest_client.get(path=path)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND.value)
+        self.assertRedirects(
+            response, reverse('users:login') + '?next=' + path
+        )
+
+    def test_profile_follow_authorized(self):
+        """Проверяем что происходит редирект
+            авторизованного пользователя"""
+        path = reverse('posts:profile_follow', kwargs={'username': self.user})
+        response = self.authorized_client.get(path=path)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND.value)
+
+    def test_profile_unfollow_guest(self):
+        """Проверяем что происходит редирект
+            не авторизованного пользователя"""
+        path = reverse(
+            'posts:profile_unfollow', kwargs={'username': self.user}
+        )
+        response = self.guest_client.get(path=path)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND.value)
+        self.assertRedirects(
+            response, reverse('users:login') + '?next=' + path
+        )
+
+    def test_profile_unfollow_authorized(self):
+        """Проверяем что происходит редирект
+            авторизованного пользователя"""
+        path = reverse(
+            'posts:profile_unfollow', kwargs={'username': self.user}
+        )
+        response = self.authorized_client.get(path=path)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND.value)

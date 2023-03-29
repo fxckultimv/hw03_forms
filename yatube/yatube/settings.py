@@ -1,3 +1,4 @@
+
 import os
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -7,15 +8,19 @@ SECRET_KEY = 'wi6@l19)oy=4q_!8wj1hmq7!rv5if4ca6%%855ez(_^l#j^)v*'
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    'localhost',
     '127.0.0.1',
-    '[::1]',
+    'localhost',
     'testserver',
 ]
 
-INTERNAL_IPS = [
-    '127.0.0.1',
-]
+CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    }
+}
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -24,12 +29,20 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'posts.apps.PostsConfig',
+    'posts',
     'users.apps.UsersConfig',
-    'core.apps.CoreConfig',
-    'sorl.thumbnail',
-    'debug_toolbar',
+    'core',
+    'sorl.thumbnail'
 ]
+
+LOGIN_URL = 'users:login'
+LOGIN_REDIRECT_URL = 'posts:index'
+
+NUMBER_OF_POSTS = 10
+
+EMAIL_BACKEND = 'django.core.mail.backends.filebased.EmailBackend'
+
+EMAIL_FILE_PATH = os.path.join(BASE_DIR, 'sent_emails')
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -39,12 +52,12 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 
 ROOT_URLCONF = 'yatube.urls'
 
 TEMPLATES_DIR = os.path.join(BASE_DIR, 'templates')
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -64,12 +77,17 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'yatube.wsgi.application'
 
+
+
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
     }
 }
+
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -86,9 +104,11 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+
+
 LANGUAGE_CODE = 'ru'
 
-TIME_ZONE = 'Europe/Moscow'
+TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
@@ -96,20 +116,10 @@ USE_L10N = True
 
 USE_TZ = True
 
-STATIC_URL = '/static/'
+
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
-LOGIN_URL = 'users:login'
-LOGIN_REDIRECT_URL = 'posts:index'
-
-EMAIL_BACKEND = 'django.core.mail.backends.filebased.EmailBackend'
-EMAIL_FILE_PATH = os.path.join(BASE_DIR, 'sent_emails')
-
-CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
+STATIC_URL = '/static/'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache', }}

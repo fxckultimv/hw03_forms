@@ -1,25 +1,31 @@
 {% extends "base.html" %}
 {% block title %}Технологии{% endblock %}
 {% block content %}
-  <main role="main" class="container">
-    <div class="row">
-      <div class="col-md-3 mb-3 mt-1">
-        <div class="card">
-          <div class="card-body">
-            <ul class="list-group list-group-flush">
-              <li class="list-group-item">
-                <div class="h3">Технологии:</div>
-              </li>
-              <li class="list-group-item">
-                <div class="h6 text-muted">Python, Django</div>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      {% with card_text='Проект дался тяжело.' %}
-        {% include 'about/includes/description.html' %}
-      {% endwith %}
-    </div>
-  </main>
+{% comment %} Колонки с отступом сверху и снизу {% endcomment %}
+<div class="row">
+  <h1>Я такие штуки умею:</h1>
+  {% comment %}
+    Боковой блок со списком технологий 
+    Займет всю ширину блока на мобильном
+    и 25% при размерах экрана ≥768px
+  {% endcomment %}
+  <aside class="col-12 col-md-3">
+    <ul class="list-group list-group-flush">
+      <li class="list-group-item">
+        Python
+      </li>
+      <li class="list-group-item">
+        Django
+      </li>
+    </ul>
+  </aside>
+  {% comment %}
+    Статья  
+    Займет всю ширину блока на мобильном
+    и 75% при размерах экрана ≥768px
+  {% endcomment %}
+  <article class="col-12 col-md-9">
+    <p>Текст какой-то</p>
+  </article>
+</div>
 {% endblock %}

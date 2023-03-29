@@ -1,40 +1,8 @@
 {% extends "base.html" %}
-{% load static %}
 {% block title %}Об авторе проекта{% endblock %}
 {% block content %}
-  <main role="main" class="container">
-    <div class="row">
-      <div class="col-md-3 mb-3 mt-1">
-        <div class="card">
-          <div class="card-body">
-            <ul class="list-group list-group-flush">
-              <li class="list-group-item">
-                <div class="h3">Об авторе</div>
-              </li>
-              <li class="list-group-item">
-                <div class="h6 text-muted">
-                  <img src="{% static 'img/Myimg.png' %}"
-                       alt="My image"
-                       style="display: block;
-                              width: 100%;
-                              height: auto;
-                              margin: auto;">
-                  <p>
-                    Комиссаров Михаил
-                  </p>
-                  <p>
-                    GitHub:
-                  </p>
-                  <a href="https://github.com/fxckultimv">https://github.com/fxckultimv</a>
-                </div>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      {% with card_text='Автор молодой DevOps.<br>Странный малый))' %}
-        {% include 'about/includes/description.html' %}
-      {% endwith %}
-    </div>
-  </main>
+<h1>Привет, я автор этого проекта, Миша.</h1>
+<p>
+  Здесь должна быть информация обо мне, но, как видите, её нет. 
+</p>
 {% endblock %}
