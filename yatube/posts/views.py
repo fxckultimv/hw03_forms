@@ -9,12 +9,18 @@ from .models import Post, Group
 SELECT_LIMIT = 10
 
 
-def index(request):
-    template = 'posts/index.html'
-    posts = Post.objects.all()
+def pagination_process(request, posts):
+    '''Пагинация, вынесенная в отдельный метод'''
     paginator = Paginator(posts, SELECT_LIMIT)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    return page_obj
+
+
+def index(request):
+    template = 'posts/index.html'
+    posts = Post.objects.select_related('author', 'group')
+    page_obj = pagination_process(request, posts)
     context = {
         'page_obj': page_obj,
     }
@@ -23,10 +29,8 @@ def index(request):
 
 def group_list(request, slug):
     group = get_object_or_404(Group, slug=slug)
-    posts = group.posts.all()
-    paginator = Paginator(posts, SELECT_LIMIT)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    posts = group.posts.select_related('author')
+    page_obj = pagination_process(request, posts)
     template = 'posts/group_list.html'
     context = {
         'group': group,
@@ -37,10 +41,8 @@ def group_list(request, slug):
 
 def profile(request, username):
     author = get_object_or_404(User, username=username)
-    posts_author = author.posts.all()
-    paginator = Paginator(posts_author, SELECT_LIMIT)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    posts = author.posts.all()
+    page_obj = pagination_process(request, posts)
     return render(request, 'posts/profile.html', {
         'author': author,
         'page_obj': page_obj
