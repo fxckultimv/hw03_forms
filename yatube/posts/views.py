@@ -1,21 +1,10 @@
-from django.core.paginator import Paginator
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 
 from .forms import PostForm
 from .models import Post, Group
-
-
-SELECT_LIMIT = 10
-
-
-def pagination_process(request, posts):
-    '''Пагинация, вынесенная в отдельный метод'''
-    paginator = Paginator(posts, SELECT_LIMIT)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    return page_obj
+from utils import pagination_process
 
 
 def index(request):
